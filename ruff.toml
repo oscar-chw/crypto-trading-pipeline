@@ -1,0 +1,14 @@
+line-length = 120
+target-version = "py311"
+# third_party/ is vendored (the blueprint, checked in its own repo), so it is not linted here.
+extend-exclude = ["third_party"]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[lint.per-file-ignores]
+# Legacy code from the original bot, kept close to the original: style rules are ignored, bug rules (B, F) are not.
+"reference/bot/**" = ["E501", "W", "I", "UP", "SIM", "RUF012", "RUF013"]
+# Original wide lines in the legacy backtester and its tests, and class-level dict stubs in the tests.
+"reference/backtest/*" = ["E501"]
+"reference/tests/**" = ["E501", "RUF012"]

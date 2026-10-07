@@ -1,0 +1,69 @@
+{
+  "aggregate": {
+    "bars": 6000,
+    "bars_per_second": 1085.7,
+    "seconds": 5.526,
+    "symbols": 4
+  },
+  "per_symbol": {
+    "BTC/USDT": {
+      "bars": 1500,
+      "entries": 7,
+      "exit_reasons": {
+        "partial_tier_1": 4,
+        "partial_tier_2": 2,
+        "stop_loss": 7
+      },
+      "max_drawdown": -0.021748610515083033,
+      "pnl": -538.732307688304,
+      "sells": 13,
+      "sharpe": -1.9503376527294374,
+      "sortino": -0.6817710742469743
+    },
+    "ICP/USDT": {
+      "bars": 1500,
+      "entries": 8,
+      "exit_reasons": {
+        "partial_tier_1": 3,
+        "partial_tier_2": 3,
+        "stop_loss": 7,
+        "take_profit_tier_3": 1
+      },
+      "max_drawdown": -0.026315699765541156,
+      "pnl": -421.1181904286568,
+      "sells": 14,
+      "sharpe": -1.4694673222168777,
+      "sortino": -0.5416996492448447
+    },
+    "PAXG/USDT": {
+      "bars": 1500,
+      "entries": 8,
+      "exit_reasons": {
+        "partial_tier_1": 2,
+        "partial_tier_2": 2,
+        "stop_loss": 6,
+        "take_profit_tier_3": 2
+      },
+      "max_drawdown": -0.014821556533781477,
+      "pnl": -266.01756134630705,
+      "sells": 12,
+      "sharpe": -0.9728578185652448,
+      "sortino": -0.39641623155290334
+    },
+    "STO/USDT": {
+      "bars": 1500,
+      "entries": 11,
+      "exit_reasons": {
+        "partial_tier_1": 7,
+        "partial_tier_2": 3,
+        "stop_loss": 10,
+        "take_profit_tier_3": 1
+      },
+      "max_drawdown": -0.01811121699758489,
+      "pnl": -198.0200854576833,
+      "sells": 21,
+      "sharpe": -0.5283889169516978,
+      "sortino": -0.25446624713029303
+    }
+  }
+}

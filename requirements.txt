@@ -1,0 +1,17 @@
+# Pinned versions the tests and the demo were run with (Python 3.11 and 3.12).
+pandas==3.0.6
+numpy==2.4.6
+PyYAML==6.0.3
+requests==2.34.2
+python-dotenv==1.2.4
+# live market data only; the offline backtest and the tests never import it
+ccxt==4.5.85
+# lint and type checks (scripts/check.sh, .github/workflows/lint.yml)
+ruff==0.16.10
+mypy==1.20.0
+pandas-stubs==3.0.5.260914
+types-PyYAML==6.0.12.20260906
+types-requests==2.33.0.20261006
+# tests
+pytest==9.1.1
+hypothesis==6.168.5

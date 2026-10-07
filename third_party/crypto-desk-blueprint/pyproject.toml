@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crypto-desk-blueprint"
+version = "0.1.0"
+description = "Blueprint, building blocks and conformance tests for a crypto trading pipeline"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26", "pandas>=2.1"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[tool.setuptools.packages.find]
+include = ["pipeline*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests", "conformance"]
+addopts = "--strict-markers -p no:cacheprovider"
+markers = [
+    "infra: stage 00 conformance",
+    "data: stage 01 conformance",
+    "features: stage 02 conformance",
+    "strategy: stage 03 conformance",
+    "pricing: stage 04 conformance",
+    "risk: stage 05 conformance",
+    "portfolio: stage 06 conformance",
+    "execution: stage 07 conformance",
+    "validation: stage 08 conformance",
+    "mutation: proves each conformance test can fail",
+    "blocks: unit tests of the shared building blocks",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"

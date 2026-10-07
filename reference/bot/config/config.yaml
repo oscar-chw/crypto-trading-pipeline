@@ -1,0 +1,107 @@
+# Trading Bot Configuration (limit-orders-only)
+
+detail_console_output: true
+initial_capital_in_usd: 50000  # paper trading starting cash; live balances come from the exchange
+transaction_fee: 0.0001  # 0.01% per side
+
+data:
+  source: "ccxt"  # ccxt | horus
+
+signal_portfolio:
+  macd: true
+  macd_1: 12
+  macd_2: 26
+  macd_3: 9
+  rsi: true
+  rsi_1: 14
+  bb: false
+  bb_1: 20
+  bb_2: 2
+  volume: false
+  price: false
+  engulfing: true  # Bullish engulfing pattern (price action confirmation)
+  entry_mode: "any_two"    # "all" | "any_two"
+  use_htf: false          # use higher timeframe confirmation
+  htf_timeframe: "4h"    # higher timeframe to compute MACD context
+  ltf_timeframe: "1h"    # primary timeframe for MACD/trend
+  use_micro_signals: true          # use micro TF for RSI/BB/Volume/Price
+  micro_signals_timeframe: "1m"   # 1m signals for execution-quality on RSI/BB/Volume/Price
+  # Order book signals
+  ob_imbalance: true  # Order book imbalance (bid/ask volume ratio)
+  ob_depth: false  # Order book depth (liquidity at best prices)
+  ob_pressure: false  # Order book pressure (buying pressure near current price)
+  ob_large_orders: false  # Large orders detection (support/resistance)
+  
+crypto_list:
+  BTC/USDT: true
+  STO/USDT: true
+  PAXG/USDT: true
+  ICP/USDT: true
+  # backups
+  ZEN/USDT: false
+  WLD/USDT: false
+  LTC/USDT: false
+  OMNI/USDT: false
+# Portfolio risk management (all USD/USDT units)
+portfolio:
+  max_drawdown: 0.1 # 10% maximum portfolio drawdown
+  auto_liq_on_conseq_loss_per_day: 3 # 0 = disable, > 0 = loss per day
+  per_crypto_max_drawdown: 1000 # USD maximum drawdown per coin
+  MTD: true
+  maximum_holding_time: 259200 # 72 hours
+  daily_check_time: "12:00" # UTC HH:MM - perform daily rollover once after this time
+  usd_per_trade: 10000
+  cash_in_hand_usd: 10000
+  target_active_coins: 4
+  # Single-coin mode: trade only one crypto with percentage of initial equity
+  single_coin_mode: false # true = enable single-coin mode
+  single_coin_symbol: "ICP/USDT" # the one crypto to trade (only used if single_coin_mode: true)
+  single_coin_pack_percentage: 0.5 # percentage of initial equity to allocate (0.0-1.0, e.g., 0.5 = 50%)
+
+
+stop_loss_take_gain:  
+  dynamic: true # false = static, true = dynamic
+  0_stop_loss: 0.02
+  #
+  1_stop_loss_by_cost: 0.00
+  1_take_gain: 0.015
+  1_sell_portion: 0.3
+  #
+  2_stop_loss_by_cost: 0.015
+  2_take_gain: 0.03
+  2_sell_portion: 0.3
+  #
+  3_stop_loss_by_cost: 0.03
+  3_take_gain: 0.05
+  3_sell_portion: 0.4
+
+# Order book signals configuration
+orderbook_signals:
+  orderbook_imbalance_threshold: 1.0  # Bid/ask volume ratio threshold (optimized: 1.0 = balanced buying pressure)
+  orderbook_depth_threshold: 0.001  # Minimum volume at best prices
+  orderbook_depth_levels: 5  # Number of price levels to check
+  orderbook_pressure_threshold: 1.5  # Bid/ask pressure ratio threshold (default: 1.5 = 50% more buying)
+  orderbook_pressure_range: 0.01  # Price range to check (1% above/below current price)
+  orderbook_large_order_threshold: 0.01  # Minimum order size to be considered "large"
+  orderbook_large_order_levels: 10  # Number of levels to check for large orders
+  orderbook_min_large_orders: 2  # Minimum number of large orders required
+
+# Rate limiting
+rate_limit:
+  orders_per_min: 15  # 15 requests per minute
+
+# Execution filter (micro-timeframe, momentum, and iceberg)
+execution_filter:
+  enabled: true
+  timeframe: "5m"  # micro TF for execution confirmation (e.g., 1m/5m)
+  momentum_enabled: true  # Enable momentum filter (blocks entry if momentum is not sustained)
+  iceberg_enabled: true  # Enable iceberg order filter (blocks entry if market manipulation detected)
+  iceberg:
+    max_history: 5  # Number of order book snapshots to track
+    stability_threshold: 0.95  # Volume stability threshold
+    refill_time_window: 2.0  # Time window (seconds) for detecting quick refills
+
+# Runtime settings
+runtime:
+  loop_interval_seconds: 0.5  # main loop sleep interval; lower => more frequent price checks
+  slow_stop: false  # slow-stop mode: true = no new entries, but stop-loss and take-profit continue
