@@ -125,8 +125,6 @@ scripts/              check.sh, conformance.sh, demo.sh, env.sh
 - **Paper is the default, live is opt-in.** Real money needs `--live` and three variables; nothing
   falls back to a default key.
 - **One JSONL copy is canonical.** The CSV stays for spreadsheets; readers must pick one copy.
-  The full streaming treatment of duplicated records is in
-  [streaming-reconciliation](https://github.com/oscar-chw/streaming-reconciliation).
 - **Swapping the strategy.** A strategy is two functions in `bot/strategy.py`:
   `signal_statuses(indicators, flags, orderbook, price, ob_config) -> {name: bool}` and
   `entry_signal_ok(statuses, flags) -> bool`; exits are `evaluate_dynamic_sl_tp(position, price,
