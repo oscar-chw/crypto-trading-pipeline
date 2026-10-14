@@ -408,10 +408,16 @@ def execute(args: argparse.Namespace) -> int:
             print(f"note: {section}.{key} is on in the config; the backtester does not replay the {what}", file=sys.stderr)
 
     if args.audit:
-        summary = write_audit(args.audit, cfg, data, timeframe, timeframe_ms,
-                              lambda sink: run_backtest(cfg, data, timeframe, on_event=sink), omitted)
-    else:
-        summary = run_backtest(cfg, data, timeframe)
+        def run_and_report(sink: EventSink) -> dict:
+            summary = run_backtest(cfg, data, timeframe, on_event=sink)
+            # Stdout failures must abort the staged run before its directory is published.
+            print(json.dumps(summary, indent=2, sort_keys=True, allow_nan=False))
+            sys.stdout.flush()
+            return summary
+
+        write_audit(args.audit, cfg, data, timeframe, timeframe_ms, run_and_report, omitted)
+        return 0
+    summary = run_backtest(cfg, data, timeframe)
     text = json.dumps(summary, indent=2, sort_keys=True, allow_nan=False)
     if args.out:
         with open(args.out, "w", encoding="utf-8") as fh:
@@ -421,4 +427,16 @@ def execute(args: argparse.Namespace) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    exit_code = main()
+    try:
+        sys.stdout.flush()
+    except OSError as error:
+        if exit_code == 0:
+            print(f"error: stdout: {error}", file=sys.stderr)
+        # Prevent the interpreter's second flush from replacing the intended exit code.
+        null_fd = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(null_fd, sys.stdout.fileno())
+        if null_fd != sys.stdout.fileno():
+            os.close(null_fd)
+        exit_code = 2
+    sys.exit(exit_code)

@@ -146,6 +146,9 @@ A row like `1735689600000,100,101,99,nan,1` is refused with a `:2: close` error 
 Correct that source cell from an authoritative source, or use a separate known-valid input; then
 rerun the same command. A failed attempt creates no completed run directory. I/O failures and
 interruption remove the staged audit; they are not retried or turned into successful runs.
+The CLI writes and flushes its summary while the audit is staged. A stdout write/flush failure
+aborts publication. A closed output pipe returns 2 without a second shutdown error, and the same
+destination can be used after correcting the output. Check the exit status before using the summary.
 The command does not alter your input or overwrite an earlier run. Publication is a directory
 rename after both files close; it is not a power-loss durability guarantee.
 

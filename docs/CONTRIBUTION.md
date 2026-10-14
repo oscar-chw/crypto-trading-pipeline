@@ -12,8 +12,10 @@ The replay and inspection work adds strict imported-OHLCV validation, optional d
 decision/fill/account audit bundles, failure cleanup, input-alias protection and a read-only saved
 audit inspector. The inspector uses Python's standard library and a separate arithmetic pass;
 it does not call the producer's broker/strategy to decide whether a saved account balances.
-The inspector leaves the replay producer, live broker/trader, configuration, dependencies and
-prior assertions unchanged. The replay extension preserves the original default numeric golden. AI coding agents implement under Oscar's design and review;
+The additions preserve strategy logic, broker fill arithmetic, the live broker/trader,
+configuration, dependencies, prior assertions and the original default numeric golden. Audit
+CLI output completes while the run is staged, so output failures can abort publication.
+AI coding agents implement under Oscar's design and review;
 the local git record identifies the exact authorship and assistance. Independent acceptance is a
 separate record, not implied by an author test pass.
 
@@ -47,6 +49,8 @@ connection is necessary to demonstrate this capability.
 | Python treats numeric 1 and boolean true as equal | A failing saved-audit case showed the schema check accepted 1; the supported boolean assumption now uses a strict identity check. |
 | A digit-only timeframe can exceed Python's integer parsing limit | The author probe and root review independently reproduced an exit-1 traceback; a new regression requires exit 2 and a file/line/timeframe diagnostic. The parser handles that conversion error without changing Python's limits. |
 | Parsing JSON does not reconcile a trading account | Reconstruct prices, costs, quantity, cost basis and cash independently; compare with actual saved fields and completion/summary. |
+| A balanced final account can conceal an unsupported interim overdraft | Check BUY admission using the existing broker's exact clipping rule; retain real clipped-fill rounding controls. |
+| A stdout failure after directory publication left an unusable retry destination | Write and flush the CLI summary while the audit is staged. Write/flush errors and interruptions leave no published audit; a real closed-pipe process test also verifies clean status and recovery. |
 | Self-consistent edits can still describe fabricated data | Report the consistency scope; compare event bytes to a separately trusted digest when identity is required. |
 | A naive test could fail for a second guard instead | Use otherwise-valid duplicate-key and oversized-record controls, joint summary/completion edits, source mutants and an independent exact-decimal oracle. |
 
@@ -75,10 +79,12 @@ These properties can be checked directly in the implementation and tests:
   is exercised with `python -S`, proving it does not depend on installed trading packages.
 - Existing CI invokes `PYTHON=python bash scripts/check.sh` on Python 3.11 and 3.12. New integration
   and property files are collected by those existing tier commands; no workflow/check is replaced.
-- The local full gate passed on Python 3.11: 54 case, 59 integration and 6 property tests,
+- The local full gate covers Python 3.11: 54 case, 68 integration and 6 property tests,
   Ruff, mypy (16 files), adapter conformance, vendor controls/mutants and the original synthetic
   golden. A separate review reproduced a malformed-timeframe failure, then confirmed the repair
-  and independently reran the full gate. The source pins are in [validation.json](validation.json).
+  and independently reran the precursor full gate. PR review then found cash-admission and stdout
+  publication issues, reproduced with additive tests before repair. The source pins and scoped
+  evidence are in [validation.json](validation.json).
 - Remote checks for each proposed revision are available in its GitHub pull request. A local
   pass is not evidence of a remote run, another Python version, production use or deployment.
 

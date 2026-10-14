@@ -67,7 +67,7 @@ Engineering results only; no trading P&L is claimed.
 
 | What | Result | Evidence |
 |---|---|---|
-| Test suite | 119 tests in three tiers (54 case, 59 integration, 6 property) pass | `bash scripts/check.sh` |
+| Test suite | 128 tests in three tiers (54 case, 68 integration, 6 property) | `bash scripts/check.sh` |
 | Blueprint conformance | 58 conformance tests pass against the adapters (data 3, features 17 x 3, strategy 3, execution venue 1) | `bash scripts/conformance.sh` |
 | Paper fills cost what backtest fills cost | `PaperBroker` buy and sell match `BacktestBroker` price and fee exactly | [test_exchange.py](reference/tests/case/test_exchange.py) |
 | Only a confirmed fill opens a position | an order left `OPEN` places no position; a partly filled ccxt order is not `FILLED` | [test_live_loop.py](reference/tests/integration/test_live_loop.py), [test_exchange.py](reference/tests/case/test_exchange.py) |

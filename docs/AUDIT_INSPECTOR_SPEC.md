@@ -25,8 +25,10 @@ Primary source: https://docs.python.org/3.11/library/json.html . No new dependen
 - An independent arithmetic pass reconstructs fills from the declared mark/slippage/fee model:
   fill_price=mark*(1+slippage) for BUY and mark*(1-slippage) for SELL; fee=rate*(fill_price*qty).
   BUY subtracts notional+fee and adds quantity; SELL adds notional-fee and subtracts quantity,
-  matching the existing broker's documented<=1e-12 residual-quantity clamp. Events must reconcile
-  with prior state, marked equity, entry/sell counts and final cash/PnL. Binary64 operations use
+  matching the existing broker's documented<=1e-12 residual-quantity clamp. An over-budget BUY can
+  only have the broker's exact clipped quantity, cash/(price*(1+fee_rate)+1e-12); its binary64
+  roundoff is preserved without a new tolerance. Otherwise-consistent interim overdrafts fail.
+  Events reconcile with prior state, marked equity, entry/sell counts and final cash/PnL. Binary64 operations use
   the producer's grouping and exact comparisons; no new permissive tolerance is introduced.
 - Summary must match completion/per-symbol counts and observed final account result. The tool
   does not independently recompute Sharpe/Sortino/drawdown, verify strategy signals, raw source

@@ -181,6 +181,11 @@ def apply_event(account: Account, event: dict, source: str, span: int, fee_rate:
         equal(fee, fee_rate * notional, source, "fee")
         account.fees += fee
         if side == "BUY":
+            if price * qty * (1 + fee_rate) > account.cash:
+                # The broker's exact clip can itself round above the cash predicate.
+                clipped = max(0.0, account.cash / (price * (1 + fee_rate) + 1e-12))
+                if qty != clipped:
+                    fail(source, "cash", "BUY exceeds available cash under the broker's clipped-fill rule")
             account.average = (account.average * account.quantity + notional) / (account.quantity + qty)
             account.quantity += qty
             account.cash -= notional + fee
