@@ -41,7 +41,7 @@
     "reference/tests/integration/test_audit_inspector.py": "29eecc8d0dc0b70f966be9f60a7a54cb34c9496355f391f046ffa0abb7c11c15",
     "reference/tests/property/test_replay_trace.py": "8d21c346c08fdfd7023bba428d81f97179508f913fe007261f8387139adbe4a3",
     "reference/tests/property/test_inspector_oracle.py": "656993f7d3cbcf06ab595e809a718662a1a237e631ae98d045eb467c74e650a5",
-    "examples/paper-replay/BTC_USDT.csv": "233a732b2492365b670e8c4c804bdfe404c0d437cd8cf5985230cef06976cde9",
+    "examples/paper-replay/BTC_USDT.csv": "1a52bdefd1efced7e2c8ec7d98e727237d2d85c332ef1df71dd60e9d3fcf38c5",
     "examples/paper-replay/config.yaml": "cc110b071415bf5ca5373724e2daaff9707b7b3334da251fab6e662a2b5d9325"
   },
   "remote_ci": "See pull request checks for the exact proposed revision.",
@@ -51,5 +51,10 @@
     "No raw-data authenticity, strategy-quality, real-fill or profitability validation.",
     "Risk ratios are not independently recomputed by the saved-audit inspector.",
     "Per-record inspection bound is not a whole-process memory/CPU guarantee."
-  ]
+  ],
+  "fixture_packaging": {
+    "change": "CRLF to LF only",
+    "parsed_rows_unchanged": true,
+    "original_raw_sha256": "233a732b2492365b670e8c4c804bdfe404c0d437cd8cf5985230cef06976cde9"
+  }
 }
