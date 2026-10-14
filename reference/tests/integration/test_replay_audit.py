@@ -145,3 +145,31 @@ def test_input_alias_cannot_be_used_as_summary_output(tmp_path, kind):
     original = csv.read_bytes()
     assert runner.main(["--config", str(config), "--data", str(data), "--out", str(alias)]) == 2
     assert csv.read_bytes() == original
+
+
+@pytest.mark.parametrize("stage", ["write", "flush"])
+@pytest.mark.parametrize("failure", [OSError, KeyboardInterrupt])
+def test_stdout_failure_aborts_before_audit_publication_and_can_recover(tmp_path, monkeypatch, stage, failure):
+    config, data, _ = inputs(tmp_path)
+    output = tmp_path / "run"
+
+    class FailingStdout:
+        def write(self, text):
+            if stage == "write":
+                raise failure("injected stdout write failure")
+            return len(text)
+
+        def flush(self):
+            if stage == "flush":
+                raise failure("injected stdout flush failure")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(runner.sys, "stdout", FailingStdout())
+        if failure is KeyboardInterrupt:
+            with pytest.raises(KeyboardInterrupt):
+                runner.main(command(config, data, output))
+        else:
+            assert runner.main(command(config, data, output)) == 2
+    assert not output.exists() and not list(tmp_path.glob(".ctp-replay-*"))
+    assert runner.main(command(config, data, output)) == 0
+    assert (output / "events.jsonl").is_file() and (output / "summary.json").is_file()

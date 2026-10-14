@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 from backtest import runner
+from backtest.audit import write_audit
+from tests.fakes import candles
 
 pytestmark = pytest.mark.integration
 ROOT = Path(__file__).resolve().parents[2]
@@ -192,3 +194,46 @@ def test_timeframe_integer_conversion_limit_has_a_field_diagnostic(bundle):
     assert run.returncode == 2
     assert "events.jsonl:1:" in run.stderr and "timeframe" in run.stderr
     assert "Traceback" not in run.stderr and not run.stdout
+
+
+def test_otherwise_balanced_audit_cannot_finance_buys_with_negative_cash(bundle):
+    assert inspect_command(bundle).returncode == 0
+    rows = event_rows(bundle)
+    starting_cash = cash = 10.0
+    rows[0]["assumptions"]["starting_cash_per_symbol"] = starting_cash
+    for event in rows[1:-1]:
+        event["cash_before"] = cash
+        for fill in event["fills"]:
+            notional = fill["price"] * fill["qty"]
+            if fill["side"] == "BUY":
+                cash -= notional + fill["fee"]
+            else:
+                cash += notional - fill["fee"]
+        event["cash_after"] = cash
+        event["equity_after"] = cash + event["quantity_after"] * event["mark_price"]
+    assert cash > 0 and any(event["cash_after"] < 0 for event in rows[1:-1])
+    rows[-1]["per_symbol"]["BTC/USDT"]["pnl"] = cash - starting_cash
+    write_events(bundle, rows)
+    summary_path = bundle / "summary.json"
+    summary = json.loads(summary_path.read_text())
+    summary["per_symbol"] = rows[-1]["per_symbol"]
+    summary_path.write_text(json.dumps(summary))
+    result = inspect_command(bundle)
+    assert result.returncode == 2
+    assert "events.jsonl:" in result.stderr and "cash" in result.stderr
+
+
+@pytest.mark.parametrize("cash,price,fee", [(1000.0, 1e6, 0.001), (10.0, 1e6, 0.1), (0.1, 1e7, 0.001)])
+def test_actual_cash_clipped_fills_pass_even_when_float_predicate_rounds_up(tmp_path, monkeypatch, cash, price, fee):
+    cfg = {"crypto_list": {"BTC/USDT": True}, "initial_capital_in_usd": cash,
+           "transaction_fee": fee, "portfolio": {"usd_per_trade": 10000, "slippage_bps": 0}}
+    data = {"BTC/USDT": candles([price] * 35, start_ms=1735689600000)}
+    monkeypatch.setattr(runner, "decide_entry", lambda *_: True)
+    output = tmp_path / "clipped"
+    write_audit(str(output), cfg, data, "1h", 3600000,
+                lambda sink: runner.run_backtest(cfg, data, "1h", on_event=sink), [])
+    rows = event_rows(output)
+    buy = next(fill for event in rows if event.get("fills") for fill in event["fills"] if fill["side"] == "BUY")
+    assert buy["price"] * buy["qty"] * (1 + fee) > cash
+    result = inspect_command(output)
+    assert result.returncode == 0, result.stderr
