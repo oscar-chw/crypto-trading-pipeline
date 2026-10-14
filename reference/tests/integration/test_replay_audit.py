@@ -2,6 +2,9 @@
 
 import hashlib
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -172,4 +175,23 @@ def test_stdout_failure_aborts_before_audit_publication_and_can_recover(tmp_path
             assert runner.main(command(config, data, output)) == 2
     assert not output.exists() and not list(tmp_path.glob(".ctp-replay-*"))
     assert runner.main(command(config, data, output)) == 0
+    assert (output / "events.jsonl").is_file() and (output / "summary.json").is_file()
+
+
+def test_closed_stdout_pipe_has_clean_cli_failure_and_same_destination_recovers(tmp_path):
+    config, data, _ = inputs(tmp_path)
+    output = tmp_path / "run"
+    argv = [sys.executable, "-m", "backtest.runner", *command(config, data, output)]
+    env = {**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parents[2])}
+    read_fd, write_fd = os.pipe()
+    os.close(read_fd)
+    try:
+        result = subprocess.run(argv, env=env, stdout=write_fd, stderr=subprocess.PIPE, text=True, timeout=30)
+    finally:
+        os.close(write_fd)
+    assert result.returncode == 2
+    assert "error:" in result.stderr and "Traceback" not in result.stderr and "Exception ignored" not in result.stderr
+    assert not output.exists() and not list(tmp_path.glob(".ctp-replay-*"))
+    recovered = subprocess.run(argv, env=env, capture_output=True, text=True, timeout=30)
+    assert recovered.returncode == 0, recovered.stderr
     assert (output / "events.jsonl").is_file() and (output / "summary.json").is_file()
