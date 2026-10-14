@@ -67,7 +67,7 @@ Engineering results only; no trading P&L is claimed.
 
 | What | Result | Evidence |
 |---|---|---|
-| Test suite | 56 tests in three tiers (38 case, 14 integration, 4 property) pass | `bash scripts/check.sh` |
+| Test suite | 119 tests in three tiers (54 case, 59 integration, 6 property) pass | `bash scripts/check.sh` |
 | Blueprint conformance | 58 conformance tests pass against the adapters (data 3, features 17 x 3, strategy 3, execution venue 1) | `bash scripts/conformance.sh` |
 | Paper fills cost what backtest fills cost | `PaperBroker` buy and sell match `BacktestBroker` price and fee exactly | [test_exchange.py](reference/tests/case/test_exchange.py) |
 | Only a confirmed fill opens a position | an order left `OPEN` places no position; a partly filled ccxt order is not `FILLED` | [test_live_loop.py](reference/tests/integration/test_live_loop.py), [test_exchange.py](reference/tests/case/test_exchange.py) |
@@ -76,6 +76,7 @@ Engineering results only; no trading P&L is claimed.
 | Offline backtest (SYNTHETIC data) | 4 coins x 1,500 hourly bars replayed in about 6 s (about 1,000 bars/s, one laptop) | [synthetic-backtest.json](reference/results/synthetic-backtest.json), `bash scripts/demo.sh` |
 | Daily P&L counts each close once | the original reader summed the JSONL and CSV copies (each close twice); fixed | [test_daily_pnl.py](reference/tests/case/test_daily_pnl.py), [test_invariants.py](reference/tests/property/test_invariants.py) |
 | Live start without keys | `--live` exits naming the missing variables, before writing anything | [test_cli.py](reference/tests/integration/test_cli.py) |
+| Auditable imported-candle replay | Invalid OHLCV is refused with file/line/field errors; optional JSONL records decisions, fills, costs and account changes, published with its summary only after a complete run | [Paper replay workflow](docs/PAPER_REPLAY.md), [input cases](reference/tests/case/test_replay_input.py), [artifact/recovery cases](reference/tests/integration/test_replay_audit.py) |
 
 ## Run it offline
 
@@ -87,6 +88,30 @@ bash scripts/demo.sh       # offline backtest on SYNTHETIC candles, no API keys
 
 The demo writes 4 coins x 1,500 hourly SYNTHETIC candles, replays them, and fails unless the result
 matches [reference/results/synthetic-backtest.json](reference/results/synthetic-backtest.json).
+
+To inspect decisions and costs on the included 130-bar SYNTHETIC input:
+
+```bash
+PYTHONPATH=reference .venv/bin/python -m backtest.runner \
+  --data examples/paper-replay --config examples/paper-replay/config.yaml \
+  --audit /tmp/ctp-paper-replay
+```
+
+Choose a new output directory for each run. It contains `events.jsonl` and `summary.json`.
+[The workflow guide](docs/PAPER_REPLAY.md) documents the CSV contract, actual fill/account events,
+failure recovery and the optimistic same-close execution assumption. This replays imported candles;
+it does not contact an exchange or resume a live/paper account.
+
+Inspect a saved bundle with the standard library, without installing the trading dependencies:
+
+```bash
+PYTHONPATH=reference python3 -S -m backtest.inspect /tmp/ctp-paper-replay
+```
+
+This checks recorded cost/account arithmetic, bar counts, completion and summary consistency,
+and prints file/line/field errors. An optional trusted digest checks event-byte identity.
+[Contribution, learning and CI evidence](docs/CONTRIBUTION.md) distinguish the original bot,
+the current additions, tested compatibility and remaining release controls.
 
 ## Paper or live trading
 
@@ -112,6 +137,7 @@ reference/backtest/   runner.py (offline replay, BacktestBroker), synthetic.py (
 reference/tests/      case/, integration/, property/ (pytest markers); fakes.py holds FakeBroker
 reference/adapters/   thin adapters from the bot to the blueprint's stage Protocols; impl.py feeds the suites
 reference/results/    the demo's expected output
+examples/paper-replay/ declared SYNTHETIC CSV input and an explicit-cost one-symbol configuration
 third_party/          crypto-desk-blueprint, vendored at a pinned commit (SOURCE.md says why and how to update)
 scripts/              check.sh, conformance.sh, demo.sh, env.sh
 ```
@@ -141,6 +167,9 @@ scripts/              check.sh, conformance.sh, demo.sh, env.sh
 - `PaperBroker` keeps its account in memory: a restart starts again from `initial_capital_in_usd`.
 - `entry_mode: all` needs every `ob_*` key listed in the config; an unlisted one blocks entries.
 - The demo data is SYNTHETIC; it shows the pipeline runs, not that the strategy works.
+- Offline replay uses independent starting cash per symbol and idealized same-bar-close market fills;
+  it is not a shared-cash portfolio simulator. Gaps are preserved, and bar-count lookbacks/annualization
+  do not turn irregular input into uniform market history. The audit makes these assumptions inspectable.
 
 ## Blueprint conformance
 

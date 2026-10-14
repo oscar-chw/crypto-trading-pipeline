@@ -1,0 +1,55 @@
+{
+  "schema": "ctp-public-validation/v1",
+  "local_observed_date": "2026-10-14",
+  "scope": "Offline replay input validation and saved-audit accounting consistency; labelled synthetic examples.",
+  "command": "PORTFOLIO_VENV=<project-environment> bash scripts/check.sh",
+  "local_result": {
+    "exit_code": 0,
+    "seconds": 43,
+    "case": 54,
+    "integration": 59,
+    "property": 6,
+    "ruff": "PASS",
+    "mypy_source_files": 16,
+    "adapter_checks": 58,
+    "vendor_controls": 13,
+    "vendor_mutants": 21,
+    "original_6000_bar_synthetic_golden": "UNCHANGED_PASS"
+  },
+  "independent_local_review": {
+    "actionable_finding": "Malformed 5000-digit timeframe escaped as a traceback.",
+    "repair": "Additive red/green regression and field-specific conversion error handling.",
+    "recheck_exit_code": 0,
+    "seconds": 43.719,
+    "source_check_example_pins": 83,
+    "no_remaining_actionable_findings_in_bounded_scope": true
+  },
+  "controls": {
+    "original_assertions_dependencies_workflows_golden": "UNCHANGED",
+    "accounting_oracle": "Independent Decimal arithmetic on binary-rational controls.",
+    "failure_recovery": "Bad fee exits2; restored bundle exits0 with identical report; input hashes unchanged.",
+    "six_inspector_mutants": "KILLED",
+    "record_budget_class_mutant": "KILLED",
+    "synthetic_example_event_sha256": "ebd6fd3e1748ef5cececc7a4dbc59abe76c3189f22f768ff5c1472e03f66aaed"
+  },
+  "source_sha256": {
+    "reference/backtest/runner.py": "d9e10bbbbbb5c312a837ae1dfb7c5b90f2bf2f1bfba7f679a758c8f7ae83a68f",
+    "reference/backtest/audit.py": "7aebad5b9a67da9652caaeb2e75abab4683fc683a133a417793a4405c9216c0d",
+    "reference/backtest/inspect.py": "c646950cb21ae025e43cec28cc2d5e828b8f6049d11fa790ae24c4540cd91685",
+    "reference/tests/case/test_replay_input.py": "c5e5f3ea6604c46a953636636b72525e5d41b70f5f4b3d36f56e5ee8f4cc85d0",
+    "reference/tests/integration/test_replay_audit.py": "9f63799a07140e811aed33d93b6c3277c3bee24c7ca912407fea2af2929c142e",
+    "reference/tests/integration/test_audit_inspector.py": "29eecc8d0dc0b70f966be9f60a7a54cb34c9496355f391f046ffa0abb7c11c15",
+    "reference/tests/property/test_replay_trace.py": "8d21c346c08fdfd7023bba428d81f97179508f913fe007261f8387139adbe4a3",
+    "reference/tests/property/test_inspector_oracle.py": "656993f7d3cbcf06ab595e809a718662a1a237e631ae98d045eb467c74e650a5",
+    "examples/paper-replay/BTC_USDT.csv": "233a732b2492365b670e8c4c804bdfe404c0d437cd8cf5985230cef06976cde9",
+    "examples/paper-replay/config.yaml": "cc110b071415bf5ca5373724e2daaff9707b7b3334da251fab6e662a2b5d9325"
+  },
+  "remote_ci": "See pull request checks for the exact proposed revision.",
+  "limitations": [
+    "Optimistic same-close simulated fills with directional slippage and per-side fees.",
+    "Independent cash account per symbol; omitted live-only signals and filters.",
+    "No raw-data authenticity, strategy-quality, real-fill or profitability validation.",
+    "Risk ratios are not independently recomputed by the saved-audit inspector.",
+    "Per-record inspection bound is not a whole-process memory/CPU guarantee."
+  ]
+}
