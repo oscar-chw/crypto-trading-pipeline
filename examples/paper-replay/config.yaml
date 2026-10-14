@@ -1,0 +1,45 @@
+# Offline example. Costs are explicit simulation assumptions, not venue estimates.
+initial_capital_in_usd: 1000
+transaction_fee: 0.001
+crypto_list:
+  BTC/USDT: true
+signal_portfolio:
+  macd: true
+  macd_1: 12
+  macd_2: 26
+  macd_3: 9
+  rsi: true
+  rsi_1: 14
+  bb: false
+  bb_1: 20
+  bb_2: 2
+  volume: false
+  price: false
+  engulfing: true
+  entry_mode: any_two
+  use_htf: false
+  htf_timeframe: 4h
+  ltf_timeframe: 1h
+  use_micro_signals: false
+  micro_signals_timeframe: 1m
+  ob_imbalance: false
+  ob_depth: false
+  ob_pressure: false
+  ob_large_orders: false
+portfolio:
+  usd_per_trade: 100
+  slippage_bps: 2
+  maximum_holding_time: 259200
+  per_crypto_max_drawdown: 1000
+stop_loss_take_gain:
+  dynamic: true
+  0_stop_loss: 0.02
+  1_stop_loss_by_cost: 0.0
+  1_take_gain: 0.015
+  1_sell_portion: 0.3
+  2_stop_loss_by_cost: 0.015
+  2_take_gain: 0.03
+  2_sell_portion: 0.3
+  3_stop_loss_by_cost: 0.03
+  3_take_gain: 0.05
+  3_sell_portion: 0.4

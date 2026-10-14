@@ -23,6 +23,7 @@ import os
 import sys
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -33,6 +34,8 @@ from bot.data.types import Position
 from bot.flow_control.stop_loss_take_profit import evaluate_dynamic_sl_tp
 from bot.strategy import entry_signal_ok, signal_statuses
 from bot.trading_logic.signal.MACD.divergence import bearish as macd_bearish_divergence
+
+from backtest.audit import EventSink, write_audit
 
 # Live-loop switches the backtester cannot replay from candles alone; reported, never silently dropped.
 LIVE_ONLY = {
@@ -74,10 +77,41 @@ def _timeframe_ms(timeframe: str) -> int:
 
 
 def load_ohlcv_csv(path: str) -> list[list[float]]:
-    """Read ts,open,high,low,close,volume rows; refuse an empty or unsorted file."""
+    """Read finite, consistent candles; errors identify the source line and field."""
+    fields = ["ts", "open", "high", "low", "close", "volume"]
+    rows: list[list[float]] = []
     with open(path, newline="", encoding="utf-8") as fh:
-        rows = [[int(r["ts"]), float(r["open"]), float(r["high"]), float(r["low"]), float(r["close"]), float(r["volume"])]
-                for r in csv.DictReader(fh)]
+        reader = csv.DictReader(fh, strict=True)
+        if reader.fieldnames is None or sorted(reader.fieldnames) != sorted(fields):
+            raise ValueError(f"{path}:1: header must contain exactly {','.join(fields)}")
+        for raw in reader:
+            line = reader.line_num
+            if set(raw) != set(fields):
+                raise ValueError(f"{path}:{line}: row must contain exactly six fields")
+            values: list[float] = []
+            for name in fields:
+                try:
+                    value = int(raw[name]) if name == "ts" else float(raw[name])
+                except (ValueError, TypeError) as error:
+                    raise ValueError(f"{path}:{line}: {name} must be numeric (ts: integer UTC milliseconds)") from error
+                if name == "ts" and not 0 <= value <= 253402300799999:
+                    raise ValueError(f"{path}:{line}: ts is outside supported UTC millisecond range")
+                if name != "ts" and (not math.isfinite(value) or (value < 0 if name == "volume" else value <= 0)):
+                    raise ValueError(f"{path}:{line}: {name} must be finite and {'nonnegative' if name in ('ts', 'volume') else 'positive'}")
+                if name == "ts":
+                    try:
+                        _ms_to_dt(int(value))
+                    except (ValueError, OverflowError, OSError) as error:
+                        raise ValueError(f"{path}:{line}: ts is outside supported UTC datetime range") from error
+                values.append(value)
+            _, open_, high, low, close, _ = values
+            if high < max(open_, close, low):
+                raise ValueError(f"{path}:{line}: high must be at least open, close and low")
+            if low > min(open_, close):
+                raise ValueError(f"{path}:{line}: low must be at most open and close")
+            if rows and values[0] <= rows[-1][0]:
+                raise ValueError(f"{path}:{line}: ts timestamps are not strictly increasing")
+            rows.append(values)
     if not rows:
         raise ValueError(f"{path}: no candles")
     if any(b[0] <= a[0] for a, b in itertools.pairwise(rows)):
@@ -175,7 +209,8 @@ def decide_entry(ind: dict[str, pd.Series], flags: dict) -> bool:
     return entry_signal_ok(signal_statuses(ind, flags), flags)
 
 
-def backtest_symbol(symbol: str, ohlcv: list[list[float]], cfg: dict, timeframe: str) -> dict:
+def backtest_symbol(symbol: str, ohlcv: list[list[float]], cfg: dict, timeframe: str,
+                    on_event: EventSink | None = None) -> dict:
     fee_rate = float(cfg.get("transaction_fee", 0.0))
     flags = cfg.get("signal_portfolio", {}) or {}
     portfolio = cfg.get("portfolio", {}) or {}
@@ -199,15 +234,35 @@ def backtest_symbol(symbol: str, ohlcv: list[list[float]], cfg: dict, timeframe:
         exits[reason] = exits.get(reason, 0) + 1
         pos = None
 
+    def emit(kind: str, decision: str, reason: str, before: tuple[float, float, int],
+             idx: int, ts: int, price: float, entry: bool | None, statuses: dict) -> None:
+        if on_event is not None:
+            cash, qty, trade_start = before
+            on_event({"type": kind, "symbol": symbol, "bar_index": idx,
+                      "bar_open_ts_ms": ts, "bar_close_ts_ms": ts + _timeframe_ms(timeframe),
+                      "mark_price": price, "decision": decision, "reason": reason,
+                      "entry_signal": entry, "signals": statuses,
+                      "cash_before": cash, "quantity_before": qty,
+                      "cash_after": broker.cash_usd, "quantity_after": broker.position_qty,
+                      "equity_after": broker.cash_usd + broker.position_qty * price,
+                      "fills": [dict(trade) for trade in broker.trades[trade_start:]]})
+
     for idx, row in enumerate(ohlcv):
         ts, price = int(row[0]), float(row[4])
+        before = broker.cash_usd, broker.position_qty, len(broker.trades)
+        decision, reason = "warmup", "insufficient_indicator_history"
+        entry: bool | None = None
+        statuses: dict = {}
         if idx >= WARMUP_BARS:
+            decision, reason = "hold", "position_open"
             ind = window_indicators(ohlcv, idx, flags)
             if pos is not None:
                 # Same order as the live loop: hard stop, then holding time, then the SL/TP ladder.
                 if pos.stop_price and price <= float(pos.stop_price):
+                    decision, reason = "exit", "stop_loss"
                     close_all("stop_loss", price, ts)
                 elif max_holding_time > 0 and (ts / 1000.0 - pos.opened_ts) >= max_holding_time:
+                    decision, reason = "exit", "max_holding_time"
                     close_all("max_holding_time", price, ts)
                     removed_from_pack = True
                 else:
@@ -220,9 +275,11 @@ def backtest_symbol(symbol: str, ohlcv: list[list[float]], cfg: dict, timeframe:
                         fee_rate=fee_rate,
                     )
                     if action["action"] == "exit":
+                        decision, reason = "exit", "exit_ladder"
                         close_all(f"take_profit_tier_{action.get('tier', 0)}" if action.get("tier") else "signal_exit", price, ts)
                     else:
                         if action["action"] == "partial_take":
+                            decision, reason = "partial_take", f"tier_{action['tier']}"
                             # Live sells a fraction of the ORIGINAL quantity at each tier.
                             qty = (pos.original_quantity or pos.quantity) * float(action["sell_fraction"])
                             pnl, sold = broker.sell(price, qty, ts)
@@ -231,17 +288,30 @@ def backtest_symbol(symbol: str, ohlcv: list[list[float]], cfg: dict, timeframe:
                             exits[f"partial_tier_{action['tier']}"] = exits.get(f"partial_tier_{action['tier']}", 0) + 1
                         pos.stop_price = float(action.get("new_stop") or pos.stop_price or 0.0) or None
                         pos.highest_tier_reached = max(int(pos.highest_tier_reached or 0), int(action.get("tier") or 0))
-            elif decide_entry(ind, flags) and not removed_from_pack and (max_coin_loss <= 0 or realized_loss_usd < max_coin_loss):
-                usd = usd_per_trade * (1.0 - 2.0 * fee_rate)  # live: fee cushion on the per-coin allocation
-                broker.buy(price, usd / price, ts)
-                if broker.position_qty > 0:
-                    pos = Position(symbol=symbol, quantity=broker.position_qty, avg_price=broker.avg_price,
-                                   entry_price=broker.avg_price, original_quantity=broker.position_qty,
-                                   opened_ts=ts / 1000.0)
+            else:
+                entry = decide_entry(ind, flags)
+                statuses = signal_statuses(ind, flags) if on_event is not None else {}
+                decision, reason = "no_entry", "signal_not_fired"
+                if entry:
+                    if removed_from_pack or (max_coin_loss > 0 and realized_loss_usd >= max_coin_loss):
+                        decision, reason = "entry_blocked", "allocation_removed" if removed_from_pack else "coin_loss_cap"
+                    else:
+                        usd = usd_per_trade * (1.0 - 2.0 * fee_rate)  # live: fee cushion on the per-coin allocation
+                        broker.buy(price, usd / price, ts)
+                        decision, reason = "entry_blocked", "insufficient_cash"
+                        if broker.position_qty > 0:
+                            decision, reason = "entry", "signal_fired"
+                            pos = Position(symbol=symbol, quantity=broker.position_qty, avg_price=broker.avg_price,
+                                           entry_price=broker.avg_price, original_quantity=broker.position_qty,
+                                           opened_ts=ts / 1000.0)
         equity.append((_ms_to_dt(ts), broker.cash_usd + broker.position_qty * price))
+        emit("bar", decision, reason, before, idx, ts, price, entry, statuses)
 
     if broker.position_qty > 0:
+        before = broker.cash_usd, broker.position_qty, len(broker.trades)
         close_all("end_of_data", float(ohlcv[-1][4]), int(ohlcv[-1][0]))
+        emit("liquidation", "exit", "end_of_data", before, len(ohlcv) - 1,
+             int(ohlcv[-1][0]), float(ohlcv[-1][4]), None, {})
         equity.append((_ms_to_dt(int(ohlcv[-1][0])), broker.cash_usd))
 
     eq = pd.Series([v for _, v in equity], index=pd.DatetimeIndex([t for t, _ in equity]))
@@ -255,9 +325,10 @@ def backtest_symbol(symbol: str, ohlcv: list[list[float]], cfg: dict, timeframe:
     return metrics
 
 
-def run_backtest(cfg: dict, data: dict[str, list[list[float]]], timeframe: str) -> dict:
+def run_backtest(cfg: dict, data: dict[str, list[list[float]]], timeframe: str,
+                 on_event: EventSink | None = None) -> dict:
     started = time.perf_counter()
-    per_symbol = {sym: backtest_symbol(sym, rows, cfg, timeframe) for sym, rows in data.items()}
+    per_symbol = {sym: backtest_symbol(sym, rows, cfg, timeframe, on_event=on_event) for sym, rows in data.items()}
     elapsed = time.perf_counter() - started
     bars = sum(m["bars"] for m in per_symbol.values())
     return {
@@ -277,17 +348,43 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--start", default="2025-10-23T00:00:00Z")
     p.add_argument("--end", default="2025-11-05T23:59:59Z")
     p.add_argument("--timeframe", default=None, help="default: signal_portfolio.ltf_timeframe")
-    p.add_argument("--out", default=None, help="write the JSON summary here")
+    output = p.add_mutually_exclusive_group()
+    output.add_argument("--out", default=None, help="write the JSON summary here")
+    output.add_argument("--audit", default=None, help="publish events.jsonl and summary.json in a NEW directory")
     args = p.parse_args(argv)
+    try:
+        return execute(args)
+    except (ValueError, OSError, csv.Error) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
 
+
+def execute(args: argparse.Namespace) -> int:
     cfg = ConfigLoader(args.config).get().raw
+    portfolio = cfg.get("portfolio") or {}
+    for field, raw, lower, upper in (
+        ("transaction_fee", cfg.get("transaction_fee", 0), 0, 1),
+        ("slippage_bps", portfolio.get("slippage_bps", 1), 0, 10000),
+        ("initial_capital_in_usd", cfg.get("initial_capital_in_usd", 50_000), 0, math.inf),
+    ):
+        try:
+            value = float(raw)
+        except (ValueError, TypeError) as error:
+            raise ValueError(f"{field} must be numeric") from error
+        if not math.isfinite(value) or not lower <= value < upper:
+            raise ValueError(f"{field} must be finite and in [{lower}, {upper})")
     timeframe = str(args.timeframe or (cfg.get("signal_portfolio") or {}).get("ltf_timeframe", "1h"))
+    timeframe_ms = _timeframe_ms(timeframe)
+    if timeframe_ms <= 0:
+        raise ValueError("timeframe must have a positive duration")
     symbols = [s for s, on in (cfg.get("crypto_list") or {}).items() if on]
     data: dict[str, list[list[float]]] = {}
+    input_paths = {Path(args.config).resolve()}
     for sym in symbols:
         if args.data:
             path = os.path.join(args.data, sym.replace("/", "_") + ".csv")
             if os.path.isfile(path):
+                input_paths.add(Path(path).resolve())
                 data[sym] = load_ohlcv_csv(path)
         else:
             rows = fetch_ohlcv_range(sym, timeframe, _to_ms(args.start), _to_ms(args.end))
@@ -296,12 +393,32 @@ def main(argv: list[str] | None = None) -> int:
     if not data:
         print(f"error: no candles for any enabled symbol {symbols}", file=sys.stderr)
         return 2
+    for symbol in symbols:
+        if symbol not in data:
+            print(f"note: no candles for enabled symbol {symbol}; excluded from replay", file=sys.stderr)
+    for output in (args.out, args.audit):
+        if output is not None:
+            target = Path(output)
+            if any(target.resolve() == path or (target.exists() and target.samefile(path)) for path in input_paths):
+                raise ValueError(f"output must not overwrite an input: {output}")
+    omitted = []
     for (section, key), what in LIVE_ONLY.items():
         if bool((cfg.get(section) or {}).get(key, False)):
+            omitted.append(f"{section}.{key}: {what}")
             print(f"note: {section}.{key} is on in the config; the backtester does not replay the {what}", file=sys.stderr)
 
+    if args.audit:
+        def run_and_report(sink: EventSink) -> dict:
+            summary = run_backtest(cfg, data, timeframe, on_event=sink)
+            # Stdout failures must abort the staged run before its directory is published.
+            print(json.dumps(summary, indent=2, sort_keys=True, allow_nan=False))
+            sys.stdout.flush()
+            return summary
+
+        write_audit(args.audit, cfg, data, timeframe, timeframe_ms, run_and_report, omitted)
+        return 0
     summary = run_backtest(cfg, data, timeframe)
-    text = json.dumps(summary, indent=2, sort_keys=True)
+    text = json.dumps(summary, indent=2, sort_keys=True, allow_nan=False)
     if args.out:
         with open(args.out, "w", encoding="utf-8") as fh:
             fh.write(text + "\n")
@@ -310,4 +427,16 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    exit_code = main()
+    try:
+        sys.stdout.flush()
+    except OSError as error:
+        if exit_code == 0:
+            print(f"error: stdout: {error}", file=sys.stderr)
+        # Prevent the interpreter's second flush from replacing the intended exit code.
+        null_fd = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(null_fd, sys.stdout.fileno())
+        if null_fd != sys.stdout.fileno():
+            os.close(null_fd)
+        exit_code = 2
+    sys.exit(exit_code)

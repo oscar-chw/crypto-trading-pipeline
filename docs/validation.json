@@ -1,0 +1,89 @@
+{
+  "schema": "ctp-public-validation/v1",
+  "local_observed_date": "2026-10-14",
+  "scope": "Offline replay input validation and saved-audit accounting consistency; labelled synthetic examples.",
+  "command": "PORTFOLIO_VENV=<project-environment> bash scripts/check.sh",
+  "independent_local_review": {
+    "actionable_finding": "Malformed 5000-digit timeframe escaped as a traceback.",
+    "repair": "Additive red/green regression and field-specific conversion error handling.",
+    "recheck_exit_code": 0,
+    "seconds": 43.719,
+    "source_check_example_pins": 83,
+    "no_remaining_actionable_findings_in_bounded_scope": true,
+    "scope": "Accepted precursor; new PR fixes require their own current-head review/CI."
+  },
+  "controls": {
+    "original_assertions_dependencies_workflows_golden": "UNCHANGED",
+    "accounting_oracle": "Independent Decimal arithmetic on binary-rational controls.",
+    "failure_recovery": "Bad fee exits2; restored bundle exits0 with identical report; input hashes unchanged.",
+    "six_inspector_mutants": "KILLED",
+    "record_budget_class_mutant": "KILLED",
+    "synthetic_example_event_sha256": "ebd6fd3e1748ef5cececc7a4dbc59abe76c3189f22f768ff5c1472e03f66aaed",
+    "stdout_process": "Real closed-pipe CLI: exit2, no shutdown noise or published audit; same destination recovers.",
+    "historical_mutant_scope": "Six inspector function mutants and record-budget class probe refer to the accepted precursor. PR fixes have additive red/green controls; no historical result is presented as a new run."
+  },
+  "source_sha256": {
+    "reference/backtest/runner.py": "36e4c46f6a8a7753ca5a7077fba6dfc2500c0c88040f1418f36f84ccd18b434f",
+    "reference/backtest/audit.py": "7aebad5b9a67da9652caaeb2e75abab4683fc683a133a417793a4405c9216c0d",
+    "reference/backtest/inspect.py": "27dc11336de7246dad6cf25b5c7be7ca3ce32358aef101cc93dcd3248cfee81d",
+    "reference/tests/case/test_replay_input.py": "c5e5f3ea6604c46a953636636b72525e5d41b70f5f4b3d36f56e5ee8f4cc85d0",
+    "reference/tests/integration/test_replay_audit.py": "74fb9b911b5da1456ce6d492c91d17c448f0d1364451b1ba2085fbe75ed7d75f",
+    "reference/tests/integration/test_audit_inspector.py": "0bfc12ccbbb0dd9ca674913d4a58531e6acb0669c350b1084049ba12d1700df3",
+    "reference/tests/property/test_replay_trace.py": "8d21c346c08fdfd7023bba428d81f97179508f913fe007261f8387139adbe4a3",
+    "reference/tests/property/test_inspector_oracle.py": "656993f7d3cbcf06ab595e809a718662a1a237e631ae98d045eb467c74e650a5",
+    "examples/paper-replay/BTC_USDT.csv": "1a52bdefd1efced7e2c8ec7d98e727237d2d85c332ef1df71dd60e9d3fcf38c5",
+    "examples/paper-replay/config.yaml": "cc110b071415bf5ca5373724e2daaff9707b7b3334da251fab6e662a2b5d9325"
+  },
+  "remote_ci": "See pull request checks for the exact proposed revision.",
+  "limitations": [
+    "Optimistic same-close simulated fills with directional slippage and per-side fees.",
+    "Independent cash account per symbol; omitted live-only signals and filters.",
+    "No raw-data authenticity, strategy-quality, real-fill or profitability validation.",
+    "Risk ratios are not independently recomputed by the saved-audit inspector.",
+    "Per-record inspection bound is not a whole-process memory/CPU guarantee."
+  ],
+  "fixture_packaging": {
+    "change": "CRLF to LF only",
+    "parsed_rows_unchanged": true,
+    "original_raw_sha256": "233a732b2492365b670e8c4c804bdfe404c0d437cd8cf5985230cef06976cde9"
+  },
+  "prior_local_result": {
+    "exit_code": 0,
+    "seconds": 43,
+    "case": 54,
+    "integration": 59,
+    "property": 6,
+    "ruff": "PASS",
+    "mypy_source_files": 16,
+    "adapter_checks": 58,
+    "vendor_controls": 13,
+    "vendor_mutants": 21,
+    "original_6000_bar_synthetic_golden": "UNCHANGED_PASS",
+    "scope": "Accepted precursor before PR review fixes"
+  },
+  "current_local_result": {
+    "focused_cases": 56,
+    "focused_exit_code": 0,
+    "full_gate": "PASS",
+    "exit_code": 0,
+    "seconds": 48,
+    "case": 54,
+    "integration": 68,
+    "property": 6,
+    "original_golden": "UNCHANGED_PASS",
+    "ruff": "PASS",
+    "mypy_source_files": 16
+  },
+  "pr_codex_review": {
+    "url": "https://github.com/oscar-chw/crypto-trading-pipeline/pull/1",
+    "initial_head": "0b521b8226e288e60a7eb0c40a099e9566f01f1e",
+    "initial_findings": [
+      "P1: over-cash BUY could reconcile to a positive final balance.",
+      "P2: stdout failure occurred after audit publication."
+    ],
+    "additive_regressions": 9,
+    "red_before_fix": "Five failure cases failed; three valid clipped-fill controls passed. Separate real closed-pipe regression failed120-versus2.",
+    "current_focused_result": "56 integration/property cases passed.",
+    "current_remote_state": "See exact head review and CI on the PR."
+  }
+}
